@@ -288,6 +288,7 @@ function Canvas() {
           edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onSelectionChange={onSelectionChange}
+          nodesConnectable={false}
           minZoom={0.1}
           maxZoom={2}
           proOptions={{ hideAttribution: false }}
