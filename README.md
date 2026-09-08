@@ -1,6 +1,5 @@
 # Flow Canvas
 
-[![npm version](https://img.shields.io/npm/v/%40elf077%2Fflow-canvas)](https://www.npmjs.com/package/@elf077/flow-canvas)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![release](https://img.shields.io/github/v/release/Practice019/flow-canvas)](https://github.com/Practice019/flow-canvas/releases)
 
