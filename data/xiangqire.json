@@ -1,0 +1,94 @@
+{
+  "project": "XiangqiRE 中国象棋联棋助手",
+  "description": "让一套 JavaFX + UCI 引擎 + YOLOv5 视觉的组合，既能本地人机对弈，也能截图识别外部平台棋盘、自动走子、捕获对手着法——核心是围绕联棋可靠性层层加固的扫描-推断-点击-自愈循环。基于对源码实际阅读生成。",
+  "generatedAt": "2026-09-08T12:20:00+08:00",
+  "generator": "deepseek-agent",
+  "nodes": [
+    {
+      "id": "stage-entry",
+      "title": "唯一入口：start.bat 五步自动引导",
+      "body": "整个项目根目录只有一个 `start.bat`，双击完成全部 5 步：① 检查/自动下载 JDK 17+（缺失从华为云镜像装 JDK 21 到 `tools\\`）② 检查/自动下载 Maven（阿里云镜像 3.9.9）③ `mvn package` 构建 `target\\xiangqire.jar` + 用 PowerShell 从 `runtime\\` 准备 model/sound/ui/openbook/templates 数据 ④ 检查皮卡鱼引擎（缺 `engine\\皮卡鱼_2024-02-18\\pikafish-avx512icl.exe` 或 `pikafish.nnue` 则从 GitHub/ghfast 镜像下载 7z 并解压）⑤ `start javaw` 启动。自动安装的工具都在 `tools\\`（已 gitignore）。",
+      "kind": "stage"
+    },
+    {
+      "id": "stage-bootstrap",
+      "title": "Main.java：提进程优先级 + 日志重定向",
+      "body": "入口类 `Main.main()` 做两件与 JS 无本地进程关系的事：① 通过 JNA 调用 `kernel32.SetPriorityClass` 把主进程提到 HIGH（注释写明对抗 MuMu 模拟器后台进程抢占 CPU，联棋响应慢的根因）；② javaw 无控制台，故把 `System.out/err` 重定向到项目根 `logs\\xiangqire_时间戳.log`，并起一个 daemon Timer 每 500ms flush，保证实时可查。最后 `Application.launch(App.class, args)`。",
+      "kind": "stage"
+    },
+    {
+      "id": "stage-ui-controller",
+      "title": "App/Controller：JavaFX 界面装配与模式切换",
+      "body": "`App.start` 加载 `fxml/app.fxml`;控制器 `Controller` 持有全部组件：Canvas 棋盘 + `ChessBoard` 逻辑、`Engine`（UCI/UCCI）、`AbstractGraphLinker`（联棋）、`OpenBookManager`（开局库）、`GlobalKeyListener`（全局快捷键）。它区分 4 个行棋方开关：`robotRed / robotBlack / robotAnalysis / linkMode`。初始化时 `loadEngine` 加载默认引擎、`initGraphLinker` 按平台 new Windows/Linux/Macos 对应实现。`initialize` 里挂 `engineComboBox / hash / thread` 监听，切换引擎热生效。窗口关闭走 `exit()`。",
+      "kind": "stage"
+    },
+    {
+      "id": "decision-engine",
+      "title": "关键决策：UCI/UCCI 子进程管道调度引擎",
+      "body": "`enginee\\Engine` 用 `Runtime.exec(enginePath)` 起 UCI/UCCI 子进程，BufferedReader/Writer 做协议管道：发 `uci`/`ucci` + 逐条 `setoption name X value Y`；起一个 **daemon 读线程**逐行消费，`nps` 行回调 `thinkDetail`、`bestmove` 行回调 `bestMove`；`Thread.stop()` 在 JDK20+ 抛 `UnsupportedOperationException`，故停止用 `interrupt()` + daemon 线程。**性能关键**：`lastThreadNum/lastHashSize` 只在 Threads/Hash 变化时才重发 `setoption`——之前每次思考都重复发送导致皮卡鱼 NNUE 网络反复重载，思考从 5~8.7 秒/步降到约 500ms/步。引擎进程同样提为 HIGH 优先级。",
+      "kind": "decision"
+    },
+    {
+      "id": "stage-board",
+      "title": "ChessBoard：棋盘逻辑、规则与记谱翻译",
+      "body": "`board\\ChessBoard` 用 `char[10][9]` 表示棋盘，负责落子（`move`/`mouseClick`）、FEN（`fenCode`）、行棋方切换。记谱翻译 `translate` 抽成了 **静态纯函数**（`translate(char[][] boardSnapshot, boolean isReverse, String move, boolean hasGo)`），棋盘快照 + 翻转参数显式传入——消除扫描线程与界面线程共享数组的竞态。`XiangqiUtils` 提供棋规核心：`canGo`（全棋子走法：兵/马蹩腿/象眼/士九宫/车阻挡/炮架）、`isJiang`（照将）、`isSha`（绝杀）——绝杀检测在每步走子后跑（观战模式也覆盖），命中只在日志记 `[GameOver]`，**不再自动停联棋**。",
+      "kind": "stage"
+    },
+    {
+      "id": "decision-yolo",
+      "title": "关键决策：YOLOv5 (ONNX Runtime) 识别棋盘棋子",
+      "body": "联棋要读懂外部平台画面，`yolov5\\OnnxModel` 加载 `model/middle.onnx`（onnxruntime 1.17.1）：`findBoardPosition` 探测棋盘区；`predict` 出候选框后做 **NMS 去重**（iou 分组取最高分）并按格子把棋子分类映射回收 `char[10][9]`。**去错觉加固**：`correctPieceColor` 对每个棋子按 RGB 分类重判颜色——抗 YOLO 种类识别偏移；输入缓冲（640×640×3 ≈4.7MB）用 `ThreadLocal` 复用，支持扫描/界面/书招多线程并发推理（具 `[perf] OnnxModel.predict` 计时日志）。",
+      "kind": "decision"
+    },
+    {
+      "id": "stage-linker-loop",
+      "title": "联棋核心：扫描-推断-点击的主自愈循环",
+      "body": "`linker\\AbstractGraphLinker`（1458 行）是灵魂：`scan()` 截屏→`findChessBoard` 识别→与程序盘 `compareBoard` 差推断出一步着法（`BoardDiffInferrer` 无状态推断类：flag1/2/3/4 区分红走/黑走/盘面重置），再 `autoClickWithConfirm` 派发鼠标点击；同时 `templateLoop` 用 `TemplateClicker.scanAndClick` 匹配「开始/再来一局」按钮。两大自愈机制：扫描线程**任何异常不再静默致死**（单轮异常记日志继续，连续崩溃达上限才重连；线程真死则模板线程检测到自动重建）；棋盘大变化/看门狗超时/崩溃超限触发**完整模拟手动重连**（`relinkFromScratch`：引擎重置+listener 复位+hwnd 校验+中断旧线程建新双线程），带 5 秒冷却防重建风暴。",
+      "kind": "stage"
+    },
+    {
+      "id": "decision-guard",
+      "title": "关键决策：防误判四层防御（v2.3.17）",
+      "body": "对手思考/走子动画期间 YOLO 瞬态（棋子读到中间格、半透明漏检、压高亮误色）可伪造一步假着法，导致程序盘误应用→引擎按幽灵局面出招→陈旧点击错位。README v2.3.17 记四层防御：① **回合一致性校验**——推断走子方必须与 `matchesTurn` 自洽（flag1==当前待走方，flag2==刚走完方），颜色误读丢弃；② **点击前布局校验**——`lastSyncedLayout` 快照 + `verifyTargetBeforeClick`，所有点击前重识别逐格比对，不一致放弃；③ **像素新鲜度复查**——校验通过后重截棋盘与参考帧像素比对（封 YOLO 0.4s 盲窗），不一致重验布局；④ **我方点击宽限期**——引擎点击后 1.2s 内 flag2 跳过，防走子动画期内读到「提起帧」重复点击。已知边界：对手选子高亮的稳定误读与真实走子在快照上不可区分，但相关点击全被拦、由重连收敛。",
+      "kind": "decision"
+    },
+    {
+      "id": "artifact-click-queue",
+      "title": "产物/机制：MouseClickQueue + 点击代际作废",
+      "body": "联棋所有走子/模板点击都进全局**串行队列** `mouse\\MouseClickQueue`（`executeAndWait` 排队执行，避免多线程竞写鼠标）。重连/新循环（程序盘重初始化）时递增 **点击代际** `linkerGeneration`，队列里上一轮的错误点击（如对方走子被误判为我方走导致的无用点击）执行时检测 `isStaleGeneration` 过期即**静默作废**，不再污染新循环。开关 `linkClickGenerationGuard`（默认 true）。另 `WindowsGraphLinker` 的点击还分 **linkClickMode** 通道：优先 `PostMessage` 消息直点、失败回退 `Robot` 物理移动，并做前端/后端坐标系自校准（`calibrateFrontScale`）。",
+      "kind": "artifact"
+    },
+    {
+      "id": "stage-openbook",
+      "title": "开局库：本地 SQLite/obk/pfBook + 云端 chessdb",
+      "body": "`openbook\\` 开局库三来源：`bh/pf` 二进制库（`BhOpenBook/PfOpenBook`，公共基类 `SqliteOpenBook` 去重）、`CloudOpenBook`（HTTP `chessdb.cn`）。`OpenBookManager.setLocalOpenBooks` 扫描配置路径按扩展名加载；`queryBook` 合并云库+本地库后按所选库招规则（最高分/最高胜率/正分数随机/完全随机）**统一排序**加载。**分类机制**：`runtime\\openbook\\` 下每个子目录=一分类，顶部分类选择器切换/新建/删除，「对弈时仅用当前分类」，切换立即生效；「添加」把库文件复制进分类，同时写入 `runtime\\openbook\\` 持久化源。云库网络查询（10-20s）移入独立缓存池，不阻塞界面线程、不拖住引擎命令串行链。",
+      "kind": "stage"
+    },
+    {
+      "id": "stage-template",
+      "title": "模板匹配：开始/再来一局（多套模板）",
+      "body": "`template\\TemplateMatcher` 用 OpenCV 风格模板截图匹配定位平台上的按钮。`TemplateClicker.scanAndClick` 每轮扫描直接匹配「开始/再来一局」，**命中（`bestConf >= threshold`）才点，不做对局状态预判**（曾用程序盘同步拦截，但结算界面棋盘仍可识别导致按钮被永久误拦、自动下一局失效，故移除）。3 秒冷却防重复点切换型按钮。**多套模板管理**：模板目录 `templates\\<套名>\\`，管理对话框顶部「套」选择器切换/新建/复制/删除（不能删当前套），切换热生效；当前套持久化在 `config.properties` 的 `templateSetName`（默认 `default`，首次升级自动迁入旧模板）。模板命中时还保存命中截图到 `templates\\<套>\\hit\\` 供诊断「真结算按钮 vs 误匹配」。",
+      "kind": "stage"
+    },
+    {
+      "id": "artifact-release",
+      "title": "产物：fat jar + config.properties + 日志",
+      "body": "最终交付 `target\\xiangqire.jar`（Maven shade ~100MB fat jar，含 JavaFX/onnxruntime/jna/jnativehook/sqlite）。运行数据在 jar 旁的 `target\\model/sound/ui/openbook/templates`（start.bat 从 `runtime\\` 合并复制，不删已有文件——GUI 运行期新增的分类库/模板套不会被下次构建清掉）。**设置持久化在项目根 `config.properties`**（UTF-8 可直编：`engineName`、`engine.N.*`、`threadNum=32`、`hashSize=2048`、`openbookCategory`、`templateSetName`、联棋各开关 linkCatchUpEnabled/linkPreClickVerify/linkClickGenerationGuard…），放项目根而非 `target\\`，`mvn clean` 不重置。Engine 输出/快捷键状态全查 `logs\\xiangqire_*.log`。",
+      "kind": "artifact"
+    }
+  ],
+  "edges": [
+    { "source": "stage-entry", "target": "stage-bootstrap", "label": "启动入口" },
+    { "source": "stage-bootstrap", "target": "stage-ui-controller", "label": "JVM 拉起 JavaFX" },
+    { "source": "stage-ui-controller", "target": "decision-engine", "label": "加载默认引擎" },
+    { "source": "decision-engine", "target": "stage-board", "label": "引擎落子到棋盘" },
+    { "source": "stage-ui-controller", "target": "decision-yolo", "label": "联棋视觉依赖" },
+    { "source": "decision-yolo", "target": "stage-linker-loop", "label": "识别结果喂入主循环" },
+    { "source": "stage-linker-loop", "target": "decision-guard", "label": "误判引出防御" },
+    { "source": "decision-guard", "target": "artifact-click-queue", "label": "点击发送经队列" },
+    { "source": "stage-linker-loop", "target": "stage-openbook", "label": "算棋先查开局库" },
+    { "source": "stage-linker-loop", "target": "stage-template", "label": "并行起新局" },
+    { "source": "stage-ui-controller", "target": "stage-openbook", "label": "本地库/云端管理" },
+    { "source": "stage-template", "target": "artifact-release", "label": "产出可运行 jar" }
+  ]
+}
