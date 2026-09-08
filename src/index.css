@@ -59,6 +59,20 @@ html, body, #root {
 .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .btn:disabled { opacity: 0.4; cursor: default; }
 
+.proj-select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  max-width: 260px;
+}
+.proj-select:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.proj-select option,
+.proj-select optgroup { background: var(--surface-2); color: var(--text); }
+
 .canvas-wrap { flex: 1 1 auto; min-height: 0; display: flex; }
 
 .canvas-wrap .react-flow { flex: 1 1 auto; }
