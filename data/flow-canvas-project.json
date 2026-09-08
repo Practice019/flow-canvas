@@ -1,0 +1,88 @@
+{
+  "project": "Flow Canvas",
+  "description": "文字即节点，链路即画布——AI 分析代码项目后，在无限画布上以文字节点浏览项目工作流程的 Web 应用。",
+  "generatedAt": "2026-09-13T10:00:00+08:00",
+  "generator": "deepseek-agent",
+  "nodes": [
+    {
+      "id": "stage-entry",
+      "title": "入口：浏览器打开画布",
+      "body": "用户在浏览器打开 `http://127.0.0.1:5273/?file=<name>.json`。URL 参数 `file` 指定要加载的链路文件（默认 `flow.json`）。如果未提供，则读取 `/data/flow.json`。\n\n入口逻辑在 `App.tsx` 的 `useEffect` 中实现：从 URL 解析文件名 → fetch `/data/${safe}` → 解析 JSON → 调用 `layoutFlow()` 布局 → 渲染 React Flow 画布。",
+      "kind": "stage"
+    },
+    {
+      "id": "stage-parse",
+      "title": "数据校验：FlowFile 结构校验",
+      "body": "加载后的数据需满足 `FlowFile` 接口（定义于 `src/types.ts`）：\n\n- `project`: string\n- `description`?: string\n- `generatedAt`: string（ISO 8601）\n- `generator`?: string\n- `nodes`: FlowNode[]（每个节点有 id/title/body/kind）\n- `edges`: FlowEdge[]（source/target/label）\n\n前端校验缺失 nodes/edges 数组，后端校验由 `validate.mjs` 执行，包括：BOM 检测、JSON 解析、必填字段、kind 枚举、id 唯一性、边悬挂检查。",
+      "kind": "stage"
+    },
+    {
+      "id": "decision-dagre",
+      "title": "关键决策：为什么用 dagre",
+      "body": "分层布局选型对比：\n\n1. 手算坐标 → 不现实，复杂图难以维护\n2. d3-force → 物理模拟不稳定，不适合确定性的拓扑输出\n3. **dagre** → 经典有向图分层算法，LR 方向（左→右）适合流程阅读\n\n选择 dagre + LR 方向，配置 `nodesep: 36, ranksep: 110`，每节点固定尺寸 280×170px。节点位置由 dagre 计算后映射到 React Flow 坐标系。",
+      "kind": "decision"
+    },
+    {
+      "id": "stage-layout",
+      "title": "布局引擎：dagre 拓扑分层",
+      "body": "布局逻辑在 `src/layout.ts`：\n\n1. 创建 `dagre.graphlib.Graph`，设置 LR 方向\n2. 为每个节点设定固定宽度 280px、高度 170px\n3. 添加边关系，调用 `dagre.layout()` 计算坐标\n4. 将 dagre 输出的绝对坐标转为 React Flow 的相对坐标（减去宽高的一半居中）\n5. 返回 Node[] 和 Edge[]，供 React Flow 渲染\n\n孤立节点（无入边也无出边）会被分配到最后一个 rank。",
+      "kind": "stage"
+    },
+    {
+      "id": "stage-render",
+      "title": "渲染层：React Flow 组件树",
+      "body": "画布核心组件构成：\n\n- `ReactFlowProvider`（App.tsx 顶层）提供全局状态\n- `ReactFlow` 组件接收 nodes/edges，配置 minZoom=0.1, maxZoom=2\n- 自定义 `FlowNodeCard`（text type: \"flow\"）渲染节点卡片\n- 自定义 `RankEdge`（type: \"rank\"）渲染连线\n- `<Background>` 点阵背景，`<Controls>` 缩放控件，`<MiniMap>` 缩略图\n\n选中节点后，右侧展开 `DetailPanel` 显示完整正文。",
+      "kind": "stage"
+    },
+    {
+      "id": "decision-backedge",
+      "title": "技术决策：循环边的特殊处理",
+      "body": "React Flow 内置的 smoothstep 边在遇到循环时**会静默消失**（已验证）。\n\n解决方案：自定义 `RankEdge` 组件统一处理所有边：\n\n- **前向边**（targetX > sourceX）：使用 `getSmoothStepPath`，圆角 16px，offset 14px\n- **回边**（targetX ≤ sourceX，即循环边）：使用 `getBezierPath`，curvature 0.55，渲染为虚线弧\n\n回边样式：虚线 `strokeDasharray: \"6 3\"`，颜色 `#6f5a3e`，标签颜色 `#a08a68`。前向边颜色 `#8b7355`，标签 `#c9b896`。",
+      "kind": "decision"
+    },
+    {
+      "id": "stage-interaction",
+      "title": "交互：节点点击与详情面板",
+      "body": "用户点击节点卡片触发 `onSelectionChange`：\n\n1. 从 React Flow 选区获取首个节点 ID\n2. 在 `DetailPanel` 中查找对应节点\n3. 渲染完整 markdown 正文（使用 `react-markdown` + `remark-gfm`）\n4. 列出所有下游关系（`file.edges.filter(source === node.id)`），显示目标标题和边 label\n\n节点卡片上的 markdown 摘要最多显示 4 行（CSS `-webkit-line-clamp: 4`）。",
+      "kind": "stage"
+    },
+    {
+      "id": "stage-export",
+      "title": "导出：整链 Markdown / JSON",
+      "body": "顶栏两个导出按钮：\n\n1. **导出 Markdown**：调用 `toMarkdown(file)`，按拓扑序（BFS 从根节点出发）遍历所有节点，每个节点输出 `## 标题` + 正文 + 出边列表。导出的 markdown **离开画布仍可完整阅读**。\n2. **导出 JSON**：直接下载原始 `flow.json`，保留完整元数据。\n\n`fileStats()` 函数显示节点数、边数、总字数统计。",
+      "kind": "stage"
+    },
+    {
+      "id": "artifact-flowjson",
+      "title": "产物：flow.json 链路文件",
+      "body": "整个项目的核心资产是 `flow.json`——一个自洽的 JSON 文件，包含：\n\n- 项目元数据（project/description/generatedAt/generator）\n- 节点数组（id/title/body/kind）\n- 边数组（source/target/label）\n\n数据放置于 `data/` 目录，画布通过 `fetch(/data/${name})` 加载。文件名使用英文 kebab-case，避免 URL 参数编码问题。\n\n已有样例：`flow.json`（本项目链路）、`understand-anything.json`（Understand-Anything 插件工作流）。",
+      "kind": "artifact"
+    },
+    {
+      "id": "detail-alignment",
+      "title": "对齐机制：markdown 一致性",
+      "body": "画布与导出的 markdown 保持一致的核心在于 `toMarkdown` 函数采用相同的拓扑排序（BFS from roots）遍历节点。这样无论用户是在画布上逐个查看，还是导出成 markdown 阅读，都能获得相同的叙事顺序。\n\n节点正文使用 markdown 语法（支持加粗、列表、代码块），画布卡片显示摘要（最多 4 行），详情面板显示全文。",
+      "kind": "detail"
+    },
+    {
+      "id": "stage-usage",
+      "title": "使用场景：AI 辅助分析项目",
+      "body": "典型工作流程：\n\n1. 用户在对话中要求「分析 XX 项目，生成流程链路」\n2. AI 阅读源码（README、package.json、入口文件、核心模块）\n3. AI 提炼叙事链，识别阶段/决策/产物/细节\n4. AI 写入 `data/<name>.json`，运行 `validate.mjs` 校验\n5. 用户打开画布查看，可选导出 markdown\n\n这是 **Flow Canvas 的核心价值主张**：把 AI 的项目分析能力转化为可视化的叙事链，而非代码符号图谱。",
+      "kind": "stage"
+    }
+  ],
+  "edges": [
+    { "source": "stage-entry", "target": "stage-parse", "label": "数据加载" },
+    { "source": "stage-parse", "target": "decision-dagre", "label": "引出布局选型" },
+    { "source": "decision-dagre", "target": "stage-layout", "label": "布局实现" },
+    { "source": "stage-layout", "target": "stage-render", "label": "进入渲染" },
+    { "source": "stage-render", "target": "decision-backedge", "label": "循环边需求" },
+    { "source": "decision-backedge", "target": "stage-render", "label": "边渲染完善" },
+    { "source": "stage-render", "target": "stage-interaction", "label": "交互层" },
+    { "source": "stage-interaction", "target": "stage-export", "label": "功能扩展" },
+    { "source": "stage-export", "target": "artifact-flowjson", "label": "产物沉淀" },
+    { "source": "artifact-flowjson", "target": "stage-usage", "label": "驱动使用" },
+    { "source": "stage-usage", "target": "stage-entry", "label": "闭环复用" },
+    { "source": "artifact-flowjson", "target": "detail-alignment", "label": "一致性保证" }
+  ]
+}
