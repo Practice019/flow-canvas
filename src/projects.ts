@@ -31,3 +31,24 @@ export function dataProjects(): ProjectEntry[] {
 export function findDataProject(name: string): ProjectEntry | undefined {
   return dataProjects().find((p) => p.name === name);
 }
+
+/** 解析并校验导入的 flow.json 文本；不合法则抛出带中文说明的错误。 */
+export function parseFlowFile(text: string, fileName: string): FlowFile {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new Error(`${fileName}：JSON 解析失败（不是合法 JSON）`);
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new Error(`${fileName}：JSON 顶层必须是对象`);
+  }
+  const f = raw as Partial<FlowFile>;
+  if (typeof f.project !== "string" || !f.project.trim()) {
+    throw new Error(`${fileName}：缺少 project 字段（项目名）`);
+  }
+  if (!Array.isArray(f.nodes) || !Array.isArray(f.edges)) {
+    throw new Error(`${fileName}：缺少 nodes/edges 数组`);
+  }
+  return f as FlowFile;
+}

@@ -215,6 +215,20 @@ html, body, #root {
   font-size: 14px;
 }
 
+.notice-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 18px;
+  font-size: 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid #6b3a1e;
+  color: #e8a878;
+  flex: 0 0 auto;
+}
+.notice-banner .close-btn { flex-shrink: 0; }
+
 /* ---- flow node card ---- */
 .flow-card {
   width: 280px;

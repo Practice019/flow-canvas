@@ -15,7 +15,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import type { FlowFile } from "./types";
 import type { ProjectEntry } from "./projects";
-import { dataProjects, findDataProject } from "./projects";
+import { dataProjects, findDataProject, parseFlowFile } from "./projects";
 import { layoutFlow } from "./layout";
 import FlowNodeCard from "./FlowNodeCard";
 import DetailPanel from "./DetailPanel";
@@ -39,6 +39,7 @@ function Canvas() {
   const [entries, setEntries] = useState<ProjectEntry[]>(() => dataProjects());
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -116,6 +117,28 @@ function Canvas() {
     [entries, loadProject]
   );
 
+  /** 导入本地 flow.json：解析校验 → 加入"本次会话导入"分组 → 立即载入。 */
+  const importFile = useCallback(
+    async (file: File) => {
+      try {
+        const text = await file.text();
+        const flow = parseFlowFile(text, file.name);
+        const entry: ProjectEntry = {
+          key: `imported:${Date.now()}`,
+          name: file.name,
+          source: "imported",
+          file: flow,
+        };
+        setEntries((prev) => [...prev, entry]);
+        setNotice(null);
+        loadProject(entry);
+      } catch (e) {
+        setNotice(`导入失败：${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+    [loadProject]
+  );
+
   if (error) {
     return <div className="load-error">加载失败：{error}</div>;
   }
@@ -165,6 +188,25 @@ function Canvas() {
           </select>
           <button
             className="btn"
+            onClick={() => fileInputRef.current?.click()}
+            title="从本地导入 flow.json 文件"
+          >
+            导入项目
+          </button>
+          <input
+            ref={fileInputRef}
+            id="import-input"
+            type="file"
+            accept=".json,application/json"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void importFile(file);
+              e.target.value = "";
+            }}
+          />
+          <button
+            className="btn"
             disabled={!active}
             onClick={() =>
               active &&
@@ -188,7 +230,23 @@ function Canvas() {
           </button>
         </div>
       </header>
-      <div className="canvas-wrap">
+      {notice && (
+        <div className="notice-banner" role="alert">
+          <span>{notice}</span>
+          <button className="close-btn" onClick={() => setNotice(null)} title="关闭">
+            ×
+          </button>
+        </div>
+      )}
+      <div
+        className="canvas-wrap"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          const file = e.dataTransfer.files?.[0];
+          if (file) void importFile(file);
+        }}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
