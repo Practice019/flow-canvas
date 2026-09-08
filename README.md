@@ -1,5 +1,9 @@
 # Flow Canvas
 
+[![npm version](https://img.shields.io/npm/v/%40elf077%2Fflow-canvas)](https://www.npmjs.com/package/@elf077/flow-canvas)
+[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+[![release](https://img.shields.io/github/v/release/Practice019/flow-canvas)](https://github.com/Practice019/flow-canvas/releases)
+
 文字即节点，链路即画布——AI 分析代码项目，产出**项目流程链路文件**（`flow.json`），在无限画布上以文字节点浏览，一键导出整链 Markdown。
 
 > 不是代码符号图谱：节点是自然语言段落（阶段/决策/产物），边是推导关系。
