@@ -1,0 +1,80 @@
+{
+  "project": "Understand-Anything",
+  "description": "AI 分析该项目工作流程后生成的项目链路：一个 Claude Code 插件如何把任意代码仓库变成可交互的知识画布。基于对源码的实际运行与解剖（非官方文档转述）。",
+  "generatedAt": "2026-09-08T01:50:00+08:00",
+  "generator": "deepseek-agent",
+  "nodes": [
+    {
+      "id": "stage-entry",
+      "title": "入口：/understand 命令",
+      "body": "用户在 Claude Code 里对一个仓库执行 `/understand`（加 `--full` 强制全量，`--language zh` 指定中文输出）。\n\n它是一个**编排入口**，不是分析器：按固定阶段调度多个 agent 和脚本，把中间产物写到 `.ua/intermediate/` 目录，最终汇总成知识图谱。",
+      "kind": "stage"
+    },
+    {
+      "id": "stage-scan",
+      "title": "扫描阶段：project-scanner 摸清仓库全貌",
+      "body": "`project-scanner` agent 先跑 `scan-project.mjs`（确定性脚本）扫描仓库：\n\n- 枚举所有文件，按扩展名分类（本项目实测 487 个文件：259 TypeScript、120 markdown、42 JavaScript…）\n- 识别文件类别：code / config / docs / infra / data\n- 产出 `scan-result.json`\n\n这一步**零 LLM 参与**，纯粹文件系统操作，快且可复现。",
+      "kind": "stage"
+    },
+    {
+      "id": "stage-imports",
+      "title": "依赖解析：Tree-Sitter 提取 import 关系",
+      "body": "`extract-import-map.mjs` 用 Tree-Sitter（WASM 版，规避了原生绑定在 Node 24 + arm64 的坑）解析每个源文件的 import/require 语句：\n\n- 解析相对路径和别名（tsconfig paths），映射到仓库内真实文件\n- 产出 `import-map.json`：文件 → 它依赖的文件列表\n\n实测本项目 228 个文件有 import，共 494 条依赖边。同样是确定性提取。",
+      "kind": "stage"
+    },
+    {
+      "id": "decision-batching",
+      "title": "关键决策：为什么分批",
+      "body": "数百个文件一次性交给 LLM 分析会爆上下文。`compute-batches.mjs` 的策略：\n\n- 按目录邻近性把文件分组（同目录文件语义相关，批内共享上下文）\n- 小批次合并（实测 352 个小批并成 15 个 misc 批）\n- 每批独立产出，失败只重跑该批\n\n**批处理是整个流水线的工程核心**：让 LLM 分析可以横向扩展、增量重跑。",
+      "kind": "decision"
+    },
+    {
+      "id": "stage-structure",
+      "title": "结构提取：每批跑 Tree-Sitter",
+      "body": "`extract-structure.mjs` 对每批文件做语法级解析：\n\n- 函数（名、参数、行范围）、类（方法数、行范围）、导出符号\n- 代码行数、配置段数、文档章节标题\n- 产出 `struct-output-{N}.json`\n\n这是给 LLM 的**事实骨架**——摘要不是凭空写的，是把这些确定事实交给 `file-analyzer` agent 组织成自然语言。",
+      "kind": "stage"
+    },
+    {
+      "id": "stage-semantics",
+      "title": "语义分析：file-analyzer 写 GraphFragment",
+      "body": "每个批次的 struct 数据 + 源码片段交给 `file-analyzer` agent（LLM），产出 GraphFragment：\n\n- **节点**：文件节点 + 显著的函数/类节点（有过滤规则：≥10 行或被导出的函数才算）\n- **摘要**：自然语言描述（这是图谱的灵魂，质量取决于这一步）\n- **标签与复杂度**：simple/moderate/complex\n- 边：contains / exports / imports\n\n人工流水线等价于跑这里时用确定性模板代替 LLM（我们实测时就是这么干的）。",
+      "kind": "stage"
+    },
+    {
+      "id": "stage-merge",
+      "title": "合并组装：merge + zod 校验",
+      "body": "`merge-batch-graphs.py` 把 30 个批次产物合成一张图：\n\n- 合并节点/边，按路径约定补 `tested_by` 边（test 文件 → 被测文件）\n- 丢弃悬挂边（指向被排除文件的 import）\n\n然后组装最终 schema：project 元数据（**必须含 gitCommitHash**，用于增量检测）、8 层分层、导览。全程 zod 严格校验，错一个字段整个图拒绝加载。",
+      "kind": "stage"
+    },
+    {
+      "id": "artifact-dashboard",
+      "title": "产物：knowledge-graph.json → 交互画布",
+      "body": "最终产物 `.ua/knowledge-graph.json` 被 dashboard 消费：\n\n- **React Flow** 渲染：层聚类容器（点开下钻）、节点卡片、连线\n- 右侧栏：项目概览 / 节点详情 / 代码查看器（prism 语法高亮）\n- 顶部：搜索（fuzzy/semantic）、过滤器、导览模式、diff 对比\n- dev server 带 token 门禁，防止本机端口被扫描\n\n我们实测：1072 节点 / 1452 边 / 8 层。",
+      "kind": "artifact"
+    },
+    {
+      "id": "stage-incremental",
+      "title": "增量更新：staleness 检测",
+      "body": "图谱不是一次性的。dashboard 启动时对比：\n\n- 生成时的 gitCommitHash vs 当前 HEAD\n- 工作区脏文件列表\n\n有变化就显示 staleness 警告横幅（我们实测改一个文件立刻触发），提示重跑 `/understand`——重跑时只分析变更文件，成本可控。",
+      "kind": "stage"
+    },
+    {
+      "id": "detail-distribution",
+      "title": "分发：插件市场 + 独立 viewer",
+      "body": "两种使用方式：\n\n1. **Claude Code 插件**：marketplace 安装，`/understand` 全自动\n2. **独立 viewer 包**：`npx <release-url>` 直接看已生成的图谱，不需要 Claude Code\n\n**局限（也是 Flow Canvas 存在的理由）**：节点是代码符号、只读、无人工修正闭环——文字链路 + 人工标记修订的缺口没人做。",
+      "kind": "detail"
+    }
+  ],
+  "edges": [
+    { "source": "stage-entry", "target": "stage-scan", "label": "调度" },
+    { "source": "stage-scan", "target": "stage-imports", "label": "文件清单" },
+    { "source": "stage-imports", "target": "decision-batching", "label": "依赖图就绪" },
+    { "source": "decision-batching", "target": "stage-structure", "label": "批划分" },
+    { "source": "stage-structure", "target": "stage-semantics", "label": "事实骨架" },
+    { "source": "stage-semantics", "target": "stage-merge", "label": "批次产物" },
+    { "source": "stage-merge", "target": "artifact-dashboard", "label": "最终图谱" },
+    { "source": "artifact-dashboard", "target": "stage-incremental", "label": "持续消费" },
+    { "source": "stage-incremental", "target": "stage-entry", "label": "变更触发重跑" },
+    { "source": "artifact-dashboard", "target": "detail-distribution", "label": "分发形态" }
+  ]
+}

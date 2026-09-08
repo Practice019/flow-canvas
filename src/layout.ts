@@ -40,18 +40,21 @@ export function layoutFlow(file: FlowFile): { nodes: Node[]; edges: Edge[] } {
 
   const edges: Edge[] = file.edges
     .filter((e) => ids.has(e.source) && ids.has(e.target))
-    .map((e, i) => ({
-      id: `e${i}-${e.source}-${e.target}`,
-      source: e.source,
-      target: e.target,
-      label: e.label,
-      type: "smoothstep",
-      style: { stroke: "#8b7355", strokeWidth: 1.5 },
-      labelStyle: { fill: "#c9b896", fontSize: 11 },
-      labelBgStyle: { fill: "#161310", fillOpacity: 0.9 },
-      labelBgPadding: [6, 3] as [number, number],
-      labelBgBorderRadius: 4,
-    }));
+    .map((e, i) => {
+      // smoothstep edges vanish SILENTLY when the topology contains a cycle
+      // (verified by controlled experiment); plain bezier is safe and clean.
+      return {
+        id: `e${i}-${e.source}-${e.target}`,
+        source: e.source,
+        target: e.target,
+        label: e.label,
+        style: { stroke: "#8b7355", strokeWidth: 1.5 },
+        labelStyle: { fill: "#c9b896", fontSize: 11 },
+        labelBgStyle: { fill: "#161310", fillOpacity: 0.9 },
+        labelBgPadding: [6, 3] as [number, number],
+        labelBgBorderRadius: 4,
+      };
+    });
 
   return { nodes, edges };
 }

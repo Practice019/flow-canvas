@@ -40,9 +40,12 @@ function Canvas() {
   const { fitView } = useReactFlow();
 
   useEffect(() => {
-    fetch("/data/flow.json")
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get("file") ?? "flow.json";
+    const safe = name.replace(/[^a-zA-Z0-9._-]/g, "");
+    fetch(`/data/${safe}`)
       .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}（文件 ${safe} 不存在？）`);
         return r.json();
       })
       .then((f: FlowFile) => {
