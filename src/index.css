@@ -83,6 +83,7 @@ html, body, #root {
   z-index: 1000;
   max-height: min(520px, calc(100% - 24px));
   overflow-y: auto;
+  overflow-x: hidden; /* 内容横向由 pre/code 自身滚动承接，容器不再产生横向滚动 */
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -109,6 +110,36 @@ html, body, #root {
 }
 .node-popup::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* ---- popup outer-edge resize handle (拖动调宽) ---- */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: col-resize;
+  z-index: 3;
+  touch-action: none;
+}
+.resize-handle--right { right: 0; }
+.resize-handle--left { left: 0; }
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 34px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.resize-handle--right::after { right: 2px; }
+.resize-handle--left::after { left: 2px; }
+.resize-handle:hover::after,
+.resize-handle:active::after {
+  background: var(--accent-dim);
 }
 
 /* ---- popup detail content (shared with .node-popup) ---- */

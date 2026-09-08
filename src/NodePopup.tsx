@@ -6,11 +6,18 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { FlowFile, FlowNode } from "./types";
 import { FONT_MAX, FONT_MIN, readFontSize, writeFontSize } from "./fontSize";
+import {
+  WIDTH_MAX,
+  WIDTH_MIN,
+  readPopupWidth,
+  writePopupWidth,
+} from "./popupWidth";
 import { NODE_W, NODE_H } from "./layout";
 import { placePopup } from "./popupPlacement";
 
@@ -60,6 +67,7 @@ export default function NodePopup({
     w: POPUP_W,
     h: POPUP_H_ESTIMATE,
   });
+  const [width, setWidth] = useState<number>(readPopupWidth);
   const ref = useRef<HTMLDivElement>(null);
 
   // 内容渲染后测量真实（可能被 max-height 截断的）高度，用于精确定位
@@ -68,7 +76,8 @@ export default function NodePopup({
     if (!el) return;
     const r = el.getBoundingClientRect();
     setSize({ w: r.width || POPUP_W, h: r.height });
-  }, [node.id, file, fontSize]);
+    // width 变化（拖动调宽）必须触发重测，否则 placePopup 拿到旧宽
+  }, [node.id, file, fontSize, width]);
 
   const outgoing = useMemo(
     () =>
@@ -113,6 +122,71 @@ export default function NodePopup({
     [fontSize]
   );
 
+  // ---- 外缘拖动调宽（增量法：新宽 = 按下基准宽 ± 位移，与 placement 解耦无抖动）----
+  const dragRef = useRef<{
+    startX: number;
+    startWidth: number;
+    side: "right" | "left";
+  } | null>(null);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+
+  const endDrag = useCallback(() => {
+    dragCleanupRef.current?.();
+    dragCleanupRef.current = null;
+    dragRef.current = null;
+    document.body.style.userSelect = "";
+    document.body.style.cursor = "";
+  }, []);
+
+  const onHandlePointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (dragRef.current) return;
+      e.preventDefault();
+      e.stopPropagation(); // 不触发 react-flow 画布平移
+      const start = {
+        startX: e.clientX,
+        startWidth: width,
+        side: placement.side,
+      };
+      dragRef.current = start;
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "col-resize";
+
+      const maxW = vw > 0 ? Math.min(WIDTH_MAX, vw - 24) : WIDTH_MAX;
+      const nextFrom = (clientX: number) => {
+        const delta =
+          start.side === "right"
+            ? clientX - start.startX
+            : start.startX - clientX;
+        return Math.min(Math.max(WIDTH_MIN, start.startWidth + delta), maxW);
+      };
+      const onMove = (ev: PointerEvent) => {
+        if (dragRef.current) setWidth(nextFrom(ev.clientX));
+      };
+      const onUp = (ev: PointerEvent) => {
+        const next = nextFrom(ev.clientX);
+        setWidth(next);
+        writePopupWidth(next);
+        endDrag();
+      };
+      const cleanup = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+      };
+      dragCleanupRef.current = cleanup;
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+    },
+    [width, placement.side, vw, endDrag]
+  );
+
+  // 拖动中弹层被卸载（Esc/点空白）时，兜底释放 window 监听与 body 样式
+  useEffect(() => {
+    return () => endDrag();
+  }, [endDrag]);
+
   return (
     <div
       ref={ref}
@@ -123,11 +197,18 @@ export default function NodePopup({
         {
           left: placement.left,
           top: placement.top,
-          width: POPUP_W,
+          width,
           "--detail-font-size": `${fontSize}px`,
         } as CSSProperties
       }
     >
+      <div
+        className={`resize-handle resize-handle--${placement.side}`}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="拖动调整弹窗宽度"
+        onPointerDown={onHandlePointerDown}
+      />
       <div className="detail-head">
         <span className={`badge badge-${node.kind ?? "stage"}`}>
           {kindZh(node.kind)}
