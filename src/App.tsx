@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   BackgroundVariant,
@@ -8,6 +8,7 @@ import {
   ReactFlowProvider,
   applyNodeChanges,
   useReactFlow,
+  useViewport,
   type Edge,
   type Node,
   type NodeChange,
@@ -18,7 +19,7 @@ import type { ProjectEntry } from "./projects";
 import { dataProjects, findDataProject, parseFlowFile } from "./projects";
 import { layoutFlow } from "./layout";
 import FlowNodeCard from "./FlowNodeCard";
-import DetailPanel from "./DetailPanel";
+import NodePopup from "./NodePopup";
 import RankEdge from "./RankEdge";
 import { toMarkdown, fileStats } from "./export";
 
@@ -44,9 +45,41 @@ function Canvas() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { fitView } = useReactFlow();
+  const viewport = useViewport();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [wrapSize, setWrapSize] = useState({ w: 0, h: 0 });
 
   const active = entries.find((e) => e.key === activeKey) ?? null;
+
+  // 弹层打开时测量画布容器尺寸（视口变换坐标以容器左上为原点）
+  useEffect(() => {
+    if (!selectedId) return;
+    const measure = () => {
+      const el = wrapRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        setWrapSize({ w: r.width, h: r.height });
+      }
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [selectedId]);
+
+  const selectedNode = active
+    ? active.file.nodes.find((n) => n.id === selectedId) ?? null
+    : null;
+  const selFlowNode = nodes.find((n) => n.id === selectedId) ?? null;
+  const outgoing = useMemo(() => {
+    if (!active || !selectedNode) return [];
+    return active.file.edges
+      .filter((e) => e.source === selectedNode.id)
+      .map((e) => ({
+        label: e.label,
+        target: active.file.nodes.find((n) => n.id === e.target)?.title ?? e.target,
+      }));
+  }, [active, selectedNode]);
 
   /** 载入项目：布局画布、同步 URL、复位视图。 */
   const loadProject = useCallback(
@@ -240,6 +273,7 @@ function Canvas() {
       )}
       <div
         className="canvas-wrap"
+        ref={wrapRef}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
@@ -262,11 +296,20 @@ function Canvas() {
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable maskColor="rgba(10,10,10,0.75)" nodeColor="#3d3428" />
         </ReactFlow>
-        <DetailPanel
-          file={active?.file ?? { project: "", generatedAt: "", nodes: [], edges: [] }}
-          selectedId={selectedId}
-          onClose={() => setSelectedId(null)}
-        />
+        {selectedNode && selFlowNode && (
+          <NodePopup
+            file={active!.file}
+            node={selectedNode}
+            nodeX={selFlowNode.position.x}
+            nodeY={selFlowNode.position.y}
+            zoom={viewport.zoom}
+            vx={viewport.x}
+            vy={viewport.y}
+            vw={wrapSize.w}
+            vh={wrapSize.h}
+            onClose={() => setSelectedId(null)}
+          />
+        )}
       </div>
     </div>
   );

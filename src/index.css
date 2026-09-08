@@ -73,9 +73,23 @@ html, body, #root {
 .proj-select option,
 .proj-select optgroup { background: var(--surface-2); color: var(--text); }
 
-.canvas-wrap { flex: 1 1 auto; min-height: 0; display: flex; }
+.canvas-wrap { flex: 1 1 auto; min-height: 0; display: flex; position: relative; }
 
 .canvas-wrap .react-flow { flex: 1 1 auto; }
+
+/* ---- node popup (floating full-text panel, replaces the fixed sidebar) ---- */
+.node-popup {
+  position: absolute;
+  z-index: 1000;
+  max-height: min(520px, calc(100% - 24px));
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  padding: 14px 16px 16px;
+  --detail-font-size: 14px;
+}
 
 /* ---- detail panel (full-text reading) ---- */
 .detail-panel {
