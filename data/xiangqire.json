@@ -1,85 +1,85 @@
 {
   "project": "XiangqiRE 中国象棋联棋助手",
-  "description": "让一套 JavaFX + UCI 引擎 + YOLOv5 视觉的组合，既能本地人机对弈，也能截图识别外部平台棋盘、自动走子、捕获对手着法——核心是围绕联棋可靠性层层加固的扫描-推断-点击-自愈循环。基于对源码实际阅读生成。",
-  "generatedAt": "2026-09-08T12:20:00+08:00",
+  "description": "一个 JavaFX 桌面象棋工具：既能本地人机对弈，也能截图识别外部平台棋盘、自动走子、捕获对手着法循环。核心是围绕联棋可靠性层层加固的「扫描 → 推断 → 点击 → 自愈」闭环。",
+  "generatedAt": "2026-09-08T20:30:00+08:00",
   "generator": "deepseek-agent",
   "nodes": [
     {
       "id": "stage-entry",
-      "title": "唯一入口：start.bat 五步自动引导",
-      "body": "整个项目根目录只有一个 `start.bat`，双击完成全部 5 步：① 检查/自动下载 JDK 17+（缺失从华为云镜像装 JDK 21 到 `tools\\`）② 检查/自动下载 Maven（阿里云镜像 3.9.9）③ `mvn package` 构建 `target\\xiangqire.jar` + 用 PowerShell 从 `runtime\\` 准备 model/sound/ui/openbook/templates 数据 ④ 检查皮卡鱼引擎（缺 `engine\\皮卡鱼_2024-02-18\\pikafish-avx512icl.exe` 或 `pikafish.nnue` 则从 GitHub/ghfast 镜像下载 7z 并解压）⑤ `start javaw` 启动。自动安装的工具都在 `tools\\`（已 gitignore）。",
+      "title": "唯一入口：一键启动的五步引导",
+      "body": "整个项目根目录只有一个启动脚本，双击它就能把一台干净机器带起来，自动完成五件事：先检查机器上有没有可用的 JDK，没有就从镜像站点下载一套专属的装进项目目录；再同样检查并补齐 Maven 构建工具；然后用 Maven 把源码打包成可运行的 fat jar，并把棋盘图、音效、识别模型、开局库、点击模板等运行数据从仓库的运行时目录复制到打包产物旁边；接着检查象棋引擎「皮卡鱼」是否就位，缺了就从 GitHub 或其国内镜像下载并解压；最后用找到的那个 JDK 拉起程序主窗口。所有自动补装的环境工具都放在项目内、不进版本库，首次运行需联网下载约两百多兆，之后全离线可用。",
       "kind": "stage"
     },
     {
       "id": "stage-bootstrap",
-      "title": "Main.java：提进程优先级 + 日志重定向",
-      "body": "入口类 `Main.main()` 做两件与 JS 无本地进程关系的事：① 通过 JNA 调用 `kernel32.SetPriorityClass` 把主进程提到 HIGH（注释写明对抗 MuMu 模拟器后台进程抢占 CPU，联棋响应慢的根因）；② javaw 无控制台，故把 `System.out/err` 重定向到项目根 `logs\\xiangqire_时间戳.log`，并起一个 daemon Timer 每 500ms flush，保证实时可查。最后 `Application.launch(App.class, args)`。",
+      "title": "程序入口：提优先级 + 日志落盘",
+      "body": "Java 程序入口在显式拉起图形界面之前先做两件打底的事。第一件是把整个程序进程的优先级提到「高」——因为联棋在实际使用时往往要跟安卓模拟器等后台程序抢 CPU，而程序响应慢的根因之一就是被它们在争抢中拖住。第二件是把标准输出和错误输出重定向到项目根的一个带时间戳的日志文件，并让日志定期自动刷新——图形程序运行时没有控制台，不做这一步，任何运行时报错、引擎输出、快捷键状态都会静默丢失，无法定位问题。做完这两件事，才正式启动图形界面。",
       "kind": "stage"
     },
     {
       "id": "stage-ui-controller",
-      "title": "App/Controller：JavaFX 界面装配与模式切换",
-      "body": "`App.start` 加载 `fxml/app.fxml`;控制器 `Controller` 持有全部组件：Canvas 棋盘 + `ChessBoard` 逻辑、`Engine`（UCI/UCCI）、`AbstractGraphLinker`（联棋）、`OpenBookManager`（开局库）、`GlobalKeyListener`（全局快捷键）。它区分 4 个行棋方开关：`robotRed / robotBlack / robotAnalysis / linkMode`。初始化时 `loadEngine` 加载默认引擎、`initGraphLinker` 按平台 new Windows/Linux/Macos 对应实现。`initialize` 里挂 `engineComboBox / hash / thread` 监听，切换引擎热生效。窗口关闭走 `exit()`。",
+      "title": "界面装配：把各模块接起来的路由中心",
+      "body": "图形界面加载一份声明式布局文件，主控制器持有绘画棋盘、象棋引擎、联棋自动走子器、开局库管理器、全局快捷键监听器等全部模块，是整个程序的中枢。它用四个开关来表达当前行棋方式：红方是机器、黑方是机器、纯分析模式、联棋模式——组合不同开关就能覆盖人机对弈、双机对战、观战分析、联棋自动走子等场景。初始化时它会按当前配置加载默认引擎，并依据运行平台选用对应的联棋底层实现。用户在下拉框里切换引擎、调整线程数或哈希大小时，界面会即时重建引擎并热生效。窗口关闭时会统一走收尾流程，把引擎、开局库、监听线程都干净地释放掉。",
       "kind": "stage"
     },
     {
       "id": "decision-engine",
-      "title": "关键决策：UCI/UCCI 子进程管道调度引擎",
-      "body": "`enginee\\Engine` 用 `Runtime.exec(enginePath)` 起 UCI/UCCI 子进程，BufferedReader/Writer 做协议管道：发 `uci`/`ucci` + 逐条 `setoption name X value Y`；起一个 **daemon 读线程**逐行消费，`nps` 行回调 `thinkDetail`、`bestmove` 行回调 `bestMove`；`Thread.stop()` 在 JDK20+ 抛 `UnsupportedOperationException`，故停止用 `interrupt()` + daemon 线程。**性能关键**：`lastThreadNum/lastHashSize` 只在 Threads/Hash 变化时才重发 `setoption`——之前每次思考都重复发送导致皮卡鱼 NNUE 网络反复重载，思考从 5~8.7 秒/步降到约 500ms/步。引擎进程同样提为 HIGH 优先级。",
+      "title": "关键决策：起子进程、用协议管道对话象棋引擎",
+      "body": "程序不自己算棋，而是把皮卡鱼等外部象棋引擎当作子进程拉起来，用象棋界通用的 UCI/UCCI 协议和它对话。启动时先握手声明协议，再按当前配置下发线程数、哈希表等选项，然后起一个后台读线程不断等引擎的输出——算棋进度出来就刷新界面的思考信息，引擎给出着法就应用落子。为了程序能干净退出，这个读线程被设为守护线程；程序停引擎时用「中断」而非强制杀线程，因为后者在高版本 JDK 下会直接抛异常。这里有个关键的提速：之前每次都重复下发哈希选项，导致引擎的网络权重反复重新加载，一步棋要算 5 到 8 秒多；改成只在参数确实变化时才下发后，一步只需要约半秒。引擎进程同样也被提到高优先级，避免在模拟器等后台抢资源时算棋变慢。",
       "kind": "decision"
     },
     {
       "id": "stage-board",
-      "title": "ChessBoard：棋盘逻辑、规则与记谱翻译",
-      "body": "`board\\ChessBoard` 用 `char[10][9]` 表示棋盘，负责落子（`move`/`mouseClick`）、FEN（`fenCode`）、行棋方切换。记谱翻译 `translate` 抽成了 **静态纯函数**（`translate(char[][] boardSnapshot, boolean isReverse, String move, boolean hasGo)`），棋盘快照 + 翻转参数显式传入——消除扫描线程与界面线程共享数组的竞态。`XiangqiUtils` 提供棋规核心：`canGo`（全棋子走法：兵/马蹩腿/象眼/士九宫/车阻挡/炮架）、`isJiang`（照将）、`isSha`（绝杀）——绝杀检测在每步走子后跑（观战模式也覆盖），命中只在日志记 `[GameOver]`，**不再自动停联棋**。",
+      "title": "棋盘逻辑：规则判定与记谱翻译",
+      "body": "棋盘本体用一个十行九列的二维数组表示，负责落子、生成局面字符串、切换行棋方等核心动作。它内置完整的中国象棋走法规则——兵卒方向、马踩蹩腿、象挡象眼、士不出九宫、车不能直穿、炮隔子吃子都在其中——并据此判断哪一方被「照将」、哪一方已被「将死」。记谱翻译（把引擎输出的坐标着法转成中文字形如「炮二平五」）被实现成不依赖外部状态的纯函数：显式传入棋盘快照和是否翻转，避免联棋的扫描线程与界面线程同时读写同一份棋盘数据造成竞态错乱。一个值得注意的设计是：每步走完后都会检测双方是否被将死，命中只在日志里记一条标记，而不会因此打断联棋流程——这是为了在观战/联棋场景下始终让自动走子循环继续跑。",
       "kind": "stage"
     },
     {
       "id": "decision-yolo",
-      "title": "关键决策：YOLOv5 (ONNX Runtime) 识别棋盘棋子",
-      "body": "联棋要读懂外部平台画面，`yolov5\\OnnxModel` 加载 `model/middle.onnx`（onnxruntime 1.17.1）：`findBoardPosition` 探测棋盘区；`predict` 出候选框后做 **NMS 去重**（iou 分组取最高分）并按格子把棋子分类映射回收 `char[10][9]`。**去错觉加固**：`correctPieceColor` 对每个棋子按 RGB 分类重判颜色——抗 YOLO 种类识别偏移；输入缓冲（640×640×3 ≈4.7MB）用 `ThreadLocal` 复用，支持扫描/界面/书招多线程并发推理（具 `[perf] OnnxModel.predict` 计时日志）。",
+      "title": "关键决策：用目标检测模型读懂屏幕上的棋盘",
+      "body": "联棋要操作外部平台，第一步是「看懂」它：程序加载一个针对象棋训练的目标检测模型，把屏幕截图画面上识别出的每个棋子定位出来，再按格子把棋子种类映射回十行九列的棋盘数组。识别有一个容易被视觉模型搞错的点就是红黑颜色，所以程序会在模型给出的类别之外，再对每个棋子按颜色像素单独复核一次，压低认错颜色导致整盘局面的风险。为了提高速度，识别的输入缓冲被做成线程复用的，让联棋扫描、界面分析、开局库取招这几条线程可以并发跑模型而不互相抢内存。每次识别的耗时都有计时，便于定位性能瓶颈。",
       "kind": "decision"
     },
     {
       "id": "stage-linker-loop",
-      "title": "联棋核心：扫描-推断-点击的主自愈循环",
-      "body": "`linker\\AbstractGraphLinker`（1458 行）是灵魂：`scan()` 截屏→`findChessBoard` 识别→与程序盘 `compareBoard` 差推断出一步着法（`BoardDiffInferrer` 无状态推断类：flag1/2/3/4 区分红走/黑走/盘面重置），再 `autoClickWithConfirm` 派发鼠标点击；同时 `templateLoop` 用 `TemplateClicker.scanAndClick` 匹配「开始/再来一局」按钮。两大自愈机制：扫描线程**任何异常不再静默致死**（单轮异常记日志继续，连续崩溃达上限才重连；线程真死则模板线程检测到自动重建）；棋盘大变化/看门狗超时/崩溃超限触发**完整模拟手动重连**（`relinkFromScratch`：引擎重置+listener 复位+hwnd 校验+中断旧线程建新双线程），带 5 秒冷却防重建风暴。",
+      "title": "联棋核心：扫描-推断-点击的主循环",
+      "body": "这是全程序最复杂的部分，用一段不断循环的自动化流程完成联棋：截取目标窗口画面，把当前棋局识别出来，与程序内置的棋局快照做差——差出一个棋子移动，据此判断是红走还是黑走、是落子还是新开一局；该我方走时就让引擎算棋并点击落子。程序还并行跑一个线程，用图像模板匹配去点平台上的「开始 / 再来一局」按钮。为了让这段长期运行不断线，程序做了两层自愈：扫描线程在任何一步出错时先记下日志继续跑，不会因为一次异常就整个死掉；只有当连续失败次数超过上限，或发现目标窗口被关闭重建、棋盘发生大变动、看门狗超时等情况时，才执行一次完整的「模拟手动重连」——把引擎、监听、窗口句柄全部复位重建，并带几秒冷却防止反复重连造成风暴。",
       "kind": "stage"
     },
     {
       "id": "decision-guard",
-      "title": "关键决策：防误判四层防御（v2.3.17）",
-      "body": "对手思考/走子动画期间 YOLO 瞬态（棋子读到中间格、半透明漏检、压高亮误色）可伪造一步假着法，导致程序盘误应用→引擎按幽灵局面出招→陈旧点击错位。README v2.3.17 记四层防御：① **回合一致性校验**——推断走子方必须与 `matchesTurn` 自洽（flag1==当前待走方，flag2==刚走完方），颜色误读丢弃；② **点击前布局校验**——`lastSyncedLayout` 快照 + `verifyTargetBeforeClick`，所有点击前重识别逐格比对，不一致放弃；③ **像素新鲜度复查**——校验通过后重截棋盘与参考帧像素比对（封 YOLO 0.4s 盲窗），不一致重验布局；④ **我方点击宽限期**——引擎点击后 1.2s 内 flag2 跳过，防走子动画期内读到「提起帧」重复点击。已知边界：对手选子高亮的稳定误读与真实走子在快照上不可区分，但相关点击全被拦、由重连收敛。",
+      "title": "关键决策：对抗识别误判的四层防御",
+      "body": "联棋最怕的坑是：对手正在思考、或走子动画还没播完时，画面的一帧瞬态（棋子正好读到两格之间、半透明漏检、被高亮压出色差）会被误认成一步「假着法」。如果程序盘据此误判走子，引擎会按一个根本不存在的局面出招，发出的点击又在对手真实落子后才生效，就会引发连环错误。为此加了四层防御：第一，推断出的走子方必须与行棋轮次自洽，颜色错误类的假识别直接丢弃；第二，每次真正点击之前，先重新完整识别一遍当前棋盘，和上次确认无误的落子局面逐格比对，只要不一致就放弃这次点击，改由主循环下一轮重新同步——假局面造的走子永远发不出去；第三，点击前再重截一次棋盘做像素比对，堵住识别模型自身短短的盲窗期；第四，自己这边点击落子后留一个短暂的「宽限期」，防止我方走子动画还没放完就重复点同一着。存在一个已知边界：对手「选中棋子高亮」造成的稳定误读和真实走子难以从一帧区分，但相关点击全部被防御拦截，最终由重连机制收敛，不会把假着法发到平台上。",
       "kind": "decision"
     },
     {
       "id": "artifact-click-queue",
-      "title": "产物/机制：MouseClickQueue + 点击代际作废",
-      "body": "联棋所有走子/模板点击都进全局**串行队列** `mouse\\MouseClickQueue`（`executeAndWait` 排队执行，避免多线程竞写鼠标）。重连/新循环（程序盘重初始化）时递增 **点击代际** `linkerGeneration`，队列里上一轮的错误点击（如对方走子被误判为我方走导致的无用点击）执行时检测 `isStaleGeneration` 过期即**静默作废**，不再污染新循环。开关 `linkClickGenerationGuard`（默认 true）。另 `WindowsGraphLinker` 的点击还分 **linkClickMode** 通道：优先 `PostMessage` 消息直点、失败回退 `Robot` 物理移动，并做前端/后端坐标系自校准（`calibrateFrontScale`）。",
+      "title": "落子通道：点击全程串行 + 过期自动作废",
+      "body": "联棋里所有走子点击和模板点击（开新局）都汇入一个全局串行队列，避免多条线程同时去操作鼠标、互相打架。重连或进入新一轮循环时会给整个队列加一代「标记」；队列里那些上一轮因为误判而排队的点击，真正执行时如果发现自己那一代已经过期，就直接原地作废不发出去——这样重连前的旧错误点击不会污染新循环、把刚复位好的棋局又点乱。用真实鼠标移动点击还内置了兜底：优先走高效的窗口消息直点，直点不可用的场景再退化为物理移动鼠标去点，并自动校准界面前端与后台坐标系之间的缩放比例，消除系统缩放率对落子定位的偏移。",
       "kind": "artifact"
     },
     {
       "id": "stage-openbook",
-      "title": "开局库：本地 SQLite/obk/pfBook + 云端 chessdb",
-      "body": "`openbook\\` 开局库三来源：`bh/pf` 二进制库（`BhOpenBook/PfOpenBook`，公共基类 `SqliteOpenBook` 去重）、`CloudOpenBook`（HTTP `chessdb.cn`）。`OpenBookManager.setLocalOpenBooks` 扫描配置路径按扩展名加载；`queryBook` 合并云库+本地库后按所选库招规则（最高分/最高胜率/正分数随机/完全随机）**统一排序**加载。**分类机制**：`runtime\\openbook\\` 下每个子目录=一分类，顶部分类选择器切换/新建/删除，「对弈时仅用当前分类」，切换立即生效；「添加」把库文件复制进分类，同时写入 `runtime\\openbook\\` 持久化源。云库网络查询（10-20s）移入独立缓存池，不阻塞界面线程、不拖住引擎命令串行链。",
+      "title": "开局库：本地多格式库 + 云端查招",
+      "body": "程序开局不直接让引擎想，而是先查开局库。本地支持常见的 .obk 与 .pfBook 两种开局库文件，底层统一走同一套存取逻辑；云端则对接 chessdb.cn，在线查库。多个本地库和一个云库的查询结果会合并，再按用户选定的取招规则（最高分、最高胜率、正分数随机、完全随机）统一排序取一步——确保不是「先加载的库永远优先、其他库分数再高也选不上」。开局库还按分类组织：每个分类是一组库文件，对弈时只用当前分类下的库，切换分类立即生效；用户新增的库会复制进当前分类，同时写入持久化目录，避免下次重新构建时被清掉。云端查招要走网络、可能要等十几秒，所以它被挪到独立的缓存池异步执行，网络慢不会堵住界面刷新，也不会拖住下一手棋的引擎计算。",
       "kind": "stage"
     },
     {
       "id": "stage-template",
-      "title": "模板匹配：开始/再来一局（多套模板）",
-      "body": "`template\\TemplateMatcher` 用 OpenCV 风格模板截图匹配定位平台上的按钮。`TemplateClicker.scanAndClick` 每轮扫描直接匹配「开始/再来一局」，**命中（`bestConf >= threshold`）才点，不做对局状态预判**（曾用程序盘同步拦截，但结算界面棋盘仍可识别导致按钮被永久误拦、自动下一局失效，故移除）。3 秒冷却防重复点切换型按钮。**多套模板管理**：模板目录 `templates\\<套名>\\`，管理对话框顶部「套」选择器切换/新建/复制/删除（不能删当前套），切换热生效；当前套持久化在 `config.properties` 的 `templateSetName`（默认 `default`，首次升级自动迁入旧模板）。模板命中时还保存命中截图到 `templates\\<套>\\hit\\` 供诊断「真结算按钮 vs 误匹配」。",
+      "title": "模板匹配：让程序认识「开始 / 再来一局」按钮",
+      "body": "联棋要能一局接着一局自动打下去，就得认得平台上的「开始 / 再来一局」按钮。程序用图像模板匹配去扫描屏幕，只有匹配到的置信度足够高才去点它，并且不做「当前是不是对局中」的额外预判——曾经想靠同步程序盘/识别对局状态来拦截，结果对局结束的结算画面仍然能认出棋盘，导致按钮被永久误拦、自动下一局失效，于是删掉拦截、完全交给匹配结果自己决定：对局中屏幕没有按钮，自然匹配不到不会误点；对局结束按钮出现，匹配命中即点新局，并带一点冷却防重复点。模板本身按「套」组织，一套针对一个平台/界面/分辨率各配一组，顶部可切换/新建/复制/删除套，切换即时生效。模板命中时会额外保存一张截图，方便日后诊断到底是真结算按钮还是在误匹配。",
       "kind": "stage"
     },
     {
       "id": "artifact-release",
-      "title": "产物：fat jar + config.properties + 日志",
-      "body": "最终交付 `target\\xiangqire.jar`（Maven shade ~100MB fat jar，含 JavaFX/onnxruntime/jna/jnativehook/sqlite）。运行数据在 jar 旁的 `target\\model/sound/ui/openbook/templates`（start.bat 从 `runtime\\` 合并复制，不删已有文件——GUI 运行期新增的分类库/模板套不会被下次构建清掉）。**设置持久化在项目根 `config.properties`**（UTF-8 可直编：`engineName`、`engine.N.*`、`threadNum=32`、`hashSize=2048`、`openbookCategory`、`templateSetName`、联棋各开关 linkCatchUpEnabled/linkPreClickVerify/linkClickGenerationGuard…），放项目根而非 `target\\`，`mvn clean` 不重置。Engine 输出/快捷键状态全查 `logs\\xiangqire_*.log`。",
+      "title": "产物：可运行 jar + 可编辑配置 + 日志",
+      "body": "最终交付一个体积约百兆的独立可运行 jar，把界面框架、识别引擎、自动化库、数据库驱动全打进去，拷贝到任意装好 Java 的机器都能跑。运行所需的模型、音效、棋盘图、开局库、点击模板放在 jar 旁边，由启动脚本从仓库同步，且采用合并复制——用户在图形界面里新增的开局库分类和模板套，不会被下一次重新构建清掉。所有设置（引擎、线程数、哈希、联棋各开关、当前分类、当前模板套等）集中持久化在项目根的一个可直接编辑的文本配置文件里，放在项目根而不是构建产物目录，因此清理重建不会重置用户配置。程序运行中的各类日志（含引擎输出、快捷键状态、联棋自愈记录）都写入带时间戳的日志文件，是排查任何问题的主入口。",
       "kind": "artifact"
     }
   ],
   "edges": [
     { "source": "stage-entry", "target": "stage-bootstrap", "label": "启动入口" },
-    { "source": "stage-bootstrap", "target": "stage-ui-controller", "label": "JVM 拉起 JavaFX" },
+    { "source": "stage-bootstrap", "target": "stage-ui-controller", "label": "拉起图形界面" },
     { "source": "stage-ui-controller", "target": "decision-engine", "label": "加载默认引擎" },
     { "source": "decision-engine", "target": "stage-board", "label": "引擎落子到棋盘" },
     { "source": "stage-ui-controller", "target": "decision-yolo", "label": "联棋视觉依赖" },
