@@ -16,6 +16,7 @@ import "@xyflow/react/dist/style.css";
 import type { FlowFile } from "./types";
 import { layoutFlow } from "./layout";
 import FlowNodeCard from "./FlowNodeCard";
+import DetailPanel from "./DetailPanel";
 
 const nodeTypes = { flow: FlowNodeCard };
 
@@ -24,6 +25,7 @@ function Canvas() {
   const [error, setError] = useState<string | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { fitView } = useReactFlow();
 
   useEffect(() => {
@@ -49,6 +51,11 @@ function Canvas() {
     setNodes((ns) => applyNodeChanges(changes, ns));
   }, []);
 
+  const onSelectionChange = useCallback((params: { nodes: Node[] }) => {
+    const first = params.nodes[0];
+    setSelectedId(first && first.type === "flow" ? first.id : null);
+  }, []);
+
   if (error) {
     return <div className="load-error">加载失败：{error}</div>;
   }
@@ -71,6 +78,7 @@ function Canvas() {
           edges={edges}
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
+          onSelectionChange={onSelectionChange}
           minZoom={0.1}
           maxZoom={2}
           proOptions={{ hideAttribution: false }}
@@ -79,6 +87,11 @@ function Canvas() {
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable maskColor="rgba(10,10,10,0.75)" nodeColor="#3d3428" />
         </ReactFlow>
+        <DetailPanel
+          file={file ?? { project: "", generatedAt: "", nodes: [], edges: [] }}
+          selectedId={selectedId}
+          onClose={() => setSelectedId(null)}
+        />
       </div>
     </div>
   );

@@ -1,4 +1,6 @@
 import { memo } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 
 interface FlowCardData extends Record<string, unknown> {
@@ -8,11 +10,7 @@ interface FlowCardData extends Record<string, unknown> {
   kind: string;
 }
 
-/** Strip markdown punctuation for the plain excerpt (子问题3 换 react-markdown). */
-function plain(md: string): string {
-  return md.replace(/[#*`>\-\[\]()]/g, "").replace(/\s+/g, " ").trim();
-}
-
+/** Compact markdown for the card excerpt: full markdown, height-capped by CSS. */
 function FlowNodeCardInner({ data, selected }: NodeProps) {
   const d = data as FlowCardData;
   return (
@@ -22,7 +20,9 @@ function FlowNodeCardInner({ data, selected }: NodeProps) {
         <span className={`badge badge-${d.kind}`}>{d.kindZh}</span>
       </div>
       <div className="card-title">{d.title}</div>
-      <div className="card-excerpt">{plain(d.body).slice(0, 80)}…</div>
+      <div className="card-md excerpt">
+        <Markdown remarkPlugins={[remarkGfm]}>{d.body}</Markdown>
+      </div>
       <Handle type="source" position={Position.Right} />
     </div>
   );
