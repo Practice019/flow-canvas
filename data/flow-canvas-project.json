@@ -19,13 +19,13 @@
     {
       "id": "decision-dagre",
       "title": "关键决策：为什么用 dagre",
-      "body": "分层布局选型对比：\n\n1. 手算坐标 → 不现实，复杂图难以维护\n2. d3-force → 物理模拟不稳定，不适合确定性的拓扑输出\n3. **dagre** → 经典有向图分层算法，LR 方向（左→右）适合流程阅读\n\n选择 dagre + LR 方向，配置 `nodesep: 36, ranksep: 110`，每节点固定尺寸 280×170px。节点位置由 dagre 计算后映射到 React Flow 坐标系。",
+      "body": "分层布局选型对比：\n\n1. 手算坐标 → 不现实，复杂图难以维护\n2. d3-force → 物理模拟不稳定，不适合确定性的拓扑输出\n3. **dagre** → 经典有向图分层算法，TB 方向（上→下）适合流程阅读\n\n选择 dagre + TB 方向，配置 `nodesep: 36, ranksep: 90`，每节点固定尺寸 280×170px。节点位置由 dagre 计算后映射到 React Flow 坐标系。",
       "kind": "decision"
     },
     {
       "id": "stage-layout",
       "title": "布局引擎：dagre 拓扑分层",
-      "body": "布局逻辑在 `src/layout.ts`：\n\n1. 创建 `dagre.graphlib.Graph`，设置 LR 方向\n2. 为每个节点设定固定宽度 280px、高度 170px\n3. 添加边关系，调用 `dagre.layout()` 计算坐标\n4. 将 dagre 输出的绝对坐标转为 React Flow 的相对坐标（减去宽高的一半居中）\n5. 返回 Node[] 和 Edge[]，供 React Flow 渲染\n\n孤立节点（无入边也无出边）会被分配到最后一个 rank。",
+      "body": "布局逻辑在 `src/layout.ts`：\n\n1. 创建 `dagre.graphlib.Graph`，设置 TB 方向\n2. 为每个节点设定固定宽度 280px、高度 170px\n3. 添加边关系，调用 `dagre.layout()` 计算坐标\n4. 将 dagre 输出的绝对坐标转为 React Flow 的相对坐标（减去宽高的一半居中）\n5. 返回 Node[] 和 Edge[]，供 React Flow 渲染\n\n边按相对位置动态选侧：`|dx|>=|dy|` 走左右、否则走上下，始终朝向目标侧。孤立节点（无入边也无出边）会被分配到最后一个 rank。",
       "kind": "stage"
     },
     {
@@ -37,7 +37,7 @@
     {
       "id": "decision-backedge",
       "title": "技术决策：循环边的特殊处理",
-      "body": "React Flow 内置的 smoothstep 边在遇到循环时**会静默消失**（已验证）。\n\n解决方案：自定义 `RankEdge` 组件统一处理所有边：\n\n- **前向边**（targetX > sourceX）：使用 `getSmoothStepPath`，圆角 16px，offset 14px\n- **回边**（targetX ≤ sourceX，即循环边）：使用 `getBezierPath`，curvature 0.55，渲染为虚线弧\n\n回边样式：虚线 `strokeDasharray: \"6 3\"`，颜色 `#6f5a3e`，标签颜色 `#a08a68`。前向边颜色 `#8b7355`，标签 `#c9b896`。",
+      "body": "React Flow 内置的 smoothstep 边在遇到循环时**会静默消失**（已验证）。\n\n解决方案：自定义 `RankEdge` 组件统一处理所有边（都走 `getSmoothStepPath`，圆角 16px、offset 14px）：\n\n- **前向边**：实线，颜色 `#8b7355`，标签 `#c9b896`\n- **回边**（目标在源上方或同级左偏，即循环回边）：渲染为**平行虚线**——dashed `strokeDasharray: \"6 3\"`，沿垂直于主方向偏移 8px，与正向边平行分离不交叉\n\n回边样式：虚线 `strokeDasharray: \"6 3\"`，颜色 `#6f5a3e`，标签颜色 `#a08a68`。节点四边各带 source/target 两对 handle，边按目标方向动态选侧。",
       "kind": "decision"
     },
     {

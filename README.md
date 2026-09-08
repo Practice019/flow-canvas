@@ -75,7 +75,7 @@ node skills/flow-canvas/scripts/validate.mjs data/<name>.json
 三段结构：`project` 元数据 + `nodes`（文字节点：id/title/body/kind）+ `edges`（推导关系：source/target/label）。**画布只是它的视图**——导出的 Markdown 离开画布仍完整可读，数据本身可提交进 git。
 
 - 节点 `id` 交付后永不更改（未来"人工标记不清晰 → AI 修订"闭环的锚点）
-- 环是合法的（如"增量检测→重跑"循环），画布用虚线弧渲染回边
+- 环是合法的（如"增量检测→重跑"循环），画布用与正向边平行的虚线渲染回边
 
 ## 项目结构
 
