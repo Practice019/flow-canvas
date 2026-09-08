@@ -25,8 +25,11 @@ export function layoutFlow(file: FlowFile): { nodes: Node[]; edges: Edge[] } {
   }
   dagre.layout(g);
 
+  // node positions, shared with edge direction classification
+  const posById = new Map<string, { x: number; y: number }>();
   const nodes: Node[] = file.nodes.map((n) => {
     const p = g.node(n.id);
+    posById.set(n.id, { x: p.x, y: p.y });
     return {
       id: n.id,
       type: "flow",
@@ -41,18 +44,15 @@ export function layoutFlow(file: FlowFile): { nodes: Node[]; edges: Edge[] } {
   const edges: Edge[] = file.edges
     .filter((e) => ids.has(e.source) && ids.has(e.target))
     .map((e, i) => {
-      // smoothstep edges vanish SILENTLY when the topology contains a cycle
-      // (verified by controlled experiment); plain bezier is safe and clean.
+      // All edges render through RankEdge (custom component): it picks
+      // smoothstep for forward edges and a dashed bezier arc for back edges.
+      // Built-in smoothstep silently vanishes when the graph has a cycle.
       return {
         id: `e${i}-${e.source}-${e.target}`,
         source: e.source,
         target: e.target,
         label: e.label,
-        style: { stroke: "#8b7355", strokeWidth: 1.5 },
-        labelStyle: { fill: "#c9b896", fontSize: 11 },
-        labelBgStyle: { fill: "#161310", fillOpacity: 0.9 },
-        labelBgPadding: [6, 3] as [number, number],
-        labelBgBorderRadius: 4,
+        type: "rank",
       };
     });
 

@@ -17,9 +17,11 @@ import type { FlowFile } from "./types";
 import { layoutFlow } from "./layout";
 import FlowNodeCard from "./FlowNodeCard";
 import DetailPanel from "./DetailPanel";
+import RankEdge from "./RankEdge";
 import { toMarkdown, fileStats } from "./export";
 
 const nodeTypes = { flow: FlowNodeCard };
+const edgeTypes = { rank: RankEdge };
 
 function downloadText(name: string, text: string, mime = "text/plain") {
   const blob = new Blob([text], { type: `${mime};charset=utf-8` });
@@ -83,7 +85,10 @@ function Canvas() {
           <span className="sub">{file?.description}</span>
         </div>
         <div className="actions">
-          <div className="meta">{file ? fileStats(file) : ""}</div>
+          <div className="meta">
+            {file ? fileStats(file) : ""}
+            <span style={{ opacity: 0.5 }}>（state: {nodes.length}n/{edges.length}e）</span>
+          </div>
           <button
             className="btn"
             disabled={!file}
@@ -105,6 +110,7 @@ function Canvas() {
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onSelectionChange={onSelectionChange}
           minZoom={0.1}
