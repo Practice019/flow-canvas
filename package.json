@@ -1,8 +1,28 @@
 {
   "name": "flow-canvas",
-  "private": true,
   "version": "0.1.0",
   "type": "module",
+  "description": "Flow Canvas：AI 分析代码项目生成 flow.json 项目流程链路，以文字节点在无限画布浏览，一键导出 Markdown",
+  "license": "MIT",
+  "keywords": [
+    "flow-canvas",
+    "project-analysis",
+    "workflow-visualization",
+    "react-flow",
+    "vite",
+    "ai-agent",
+    "skill"
+  ],
+  "files": [
+    "data",
+    "docs",
+    "skills",
+    "src",
+    "index.html",
+    "vite.config.ts",
+    "tsconfig.json",
+    "pnpm-lock.yaml"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
