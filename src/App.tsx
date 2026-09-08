@@ -17,8 +17,19 @@ import type { FlowFile } from "./types";
 import { layoutFlow } from "./layout";
 import FlowNodeCard from "./FlowNodeCard";
 import DetailPanel from "./DetailPanel";
+import { toMarkdown, fileStats } from "./export";
 
 const nodeTypes = { flow: FlowNodeCard };
+
+function downloadText(name: string, text: string, mime = "text/plain") {
+  const blob = new Blob([text], { type: `${mime};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function Canvas() {
   const [file, setFile] = useState<FlowFile | null>(null);
@@ -68,8 +79,22 @@ function Canvas() {
           <strong>{file?.project ?? "Flow Canvas"}</strong>
           <span className="sub">{file?.description}</span>
         </div>
-        <div className="meta">
-          {nodes.length} 节点 · {edges.length} 连线
+        <div className="actions">
+          <div className="meta">{file ? fileStats(file) : ""}</div>
+          <button
+            className="btn"
+            disabled={!file}
+            onClick={() => file && downloadText(`${file.project}-流程链路.md`, toMarkdown(file), "text/markdown")}
+          >
+            导出 Markdown
+          </button>
+          <button
+            className="btn"
+            disabled={!file}
+            onClick={() => file && downloadText("flow.json", JSON.stringify(file, null, 2), "application/json")}
+          >
+            导出 JSON
+          </button>
         </div>
       </header>
       <div className="canvas-wrap">

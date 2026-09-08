@@ -45,6 +45,20 @@ html, body, #root {
 }
 .meta { color: var(--text-dim); font-size: 12px; flex-shrink: 0; }
 
+.actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+
 .canvas-wrap { flex: 1 1 auto; min-height: 0; display: flex; }
 
 .canvas-wrap .react-flow { flex: 1 1 auto; }
