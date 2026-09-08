@@ -1,4 +1,4 @@
-/** Detail panel font-size state, persisted to localStorage. */
+/** Node popup font-size state, persisted to localStorage. */
 
 const KEY = "fc-detail-font-size";
 export const FONT_MIN = 12;

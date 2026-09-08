@@ -91,17 +91,7 @@ html, body, #root {
   --detail-font-size: 14px;
 }
 
-/* ---- detail panel (full-text reading) ---- */
-.detail-panel {
-  width: 360px;
-  flex: 0 0 360px;
-  border-left: 1px solid var(--border);
-  background: var(--surface);
-  overflow-y: auto;
-  padding: 18px;
-  --detail-font-size: 14px;
-}
-.detail-panel:empty { display: none; }
+/* ---- popup detail content (shared with .node-popup) ---- */
 
 .detail-head {
   display: flex;
