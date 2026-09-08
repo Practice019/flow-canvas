@@ -89,6 +89,26 @@ html, body, #root {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   padding: 14px 16px 16px;
   --detail-font-size: 14px;
+  /* ---- scrollbar styling ---- */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--surface);
+}
+.node-popup::-webkit-scrollbar {
+  width: 8px;
+}
+.node-popup::-webkit-scrollbar-track {
+  background: var(--surface);
+  border-radius: 4px;
+}
+.node-popup::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+.node-popup::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-dim);
+}
+.node-popup::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ---- popup detail content (shared with .node-popup) ---- */
